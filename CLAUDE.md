@@ -118,6 +118,10 @@ o `PASSWORD_RESET` fica na fila `notification-commands` e é validado pelo contr
 Comandos: `npm run lint`, `npm test` (sem Docker), `npm run test:coverage` (com o compose; é o que o CI
 roda), `npm run dev`, `npm run migrate`, `npm run build`. Decisões de implementação:
 
+- O verificador segue o [contrato do JWT](https://github.com/hackathon-fiap-soat/fiapx-docs/blob/main/contracts/jwt/README.md)
+  (só RS256, `iss`, `aud`, `exp`, tolerância de 30 s, claims `sub`/`email`/`name`), testado pelos vetores em
+  `tests/contract/jwt.test.js`. Mudou uma regra? Mude o contrato e os vetores no `fiapx-docs` primeiro,
+  porque o `fiapx-video-api` valida o mesmo token.
 - O authorizer fica fora da VPC e recebe a chave pública por variável de ambiente (o Terraform lê do SSM no
   deploy). Rotacionar a chave exige novo deploy do `fiapx-auth`.
 - Login de e-mail inexistente compara a senha com um hash bcrypt fictício, para o tempo de resposta não

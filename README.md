@@ -88,8 +88,10 @@ npm run test:integration    # integração com o ambiente local de pé
 npm run test:coverage       # tudo, com cobertura mínima de 80% (é o que o CI roda)
 ```
 
-- O contract test valida o `SendNotification` contra os schemas de `../fiapx-docs/contracts` (ou
-  `CONTRACTS_DIR`).
+- Os contract tests validam o `SendNotification` contra os schemas de `../fiapx-docs/contracts` (ou
+  `CONTRACTS_DIR`) e rodam os vetores do [contrato do JWT](https://github.com/hackathon-fiap-soat/fiapx-docs/blob/main/contracts/jwt/README.md)
+  no verificador do authorizer. O `fiapx-video-api` (Laravel) roda os mesmos vetores, então os dois aceitam
+  e recusam exatamente os mesmos tokens.
 - A integração usa os mesmos handlers da AWS, com MySQL, SSM, Secrets Manager e SQS do LocalStack.
 
 ## Variáveis de ambiente

@@ -94,7 +94,7 @@ describe('authorizeRequest', () => {
       jwt.sign(base, outra, opcoes),
       jwt.sign(base, chavesRsa().privateKey, { ...opcoes, issuer: 'outro' }),
       jwt.sign(base, chavesRsa().privateKey, { ...opcoes, audience: 'outra-api' }),
-      jwt.sign({ ...base, exp: Math.floor(Date.now() / 1000) - 10 }, chavesRsa().privateKey, opcoes),
+      jwt.sign({ ...base, exp: Math.floor(Date.now() / 1000) - 60 }, chavesRsa().privateKey, opcoes),
       jwt.sign({ name: 'X' }, chavesRsa().privateKey, opcoes),
     ];
     for (const t of tokens) {

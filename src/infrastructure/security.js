@@ -8,6 +8,7 @@ const { InvalidAccessTokenError } = require('../domain/errors');
 const ISSUER = 'fiapx-auth';
 const AUDIENCE = 'fiapx-api';
 const VALIDADE_S = 3600;
+const TOLERANCIA_S = 30;
 
 /** bcrypt com custo 12 (spec §8.3). */
 function bcryptHasher(custo = 12) {
@@ -37,8 +38,12 @@ function jwtVerifier(chavePublica) {
     async verify(token) {
       const chave = await chavePublica();
       try {
-        const claims = jwt.verify(token, chave, { algorithms: ['RS256'], issuer: ISSUER, audience: AUDIENCE });
-        if (!claims.sub || !claims.email) throw new Error('claims obrigatórias ausentes');
+        // Mesmas regras do fiapx-video-api (fiapx-docs/contracts/jwt): só RS256, iss, aud, exp obrigatório,
+        // tolerância de 30 s e claims sub, email e name.
+        const claims = jwt.verify(token, chave, {
+          algorithms: ['RS256'], issuer: ISSUER, audience: AUDIENCE, clockTolerance: TOLERANCIA_S,
+        });
+        if (!claims.exp || !claims.sub || !claims.email || !claims.name) throw new Error('claims obrigatórias ausentes');
         return claims;
       } catch (e) {
         throw new InvalidAccessTokenError(e.message);
@@ -70,4 +75,4 @@ function uuidV7(agora = Date.now()) {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
-module.exports = { bcryptHasher, jwtIssuer, jwtVerifier, secureTokenGenerator, uuidV7, ISSUER, AUDIENCE, VALIDADE_S };
+module.exports = { bcryptHasher, jwtIssuer, jwtVerifier, secureTokenGenerator, uuidV7, ISSUER, AUDIENCE, VALIDADE_S, TOLERANCIA_S };
