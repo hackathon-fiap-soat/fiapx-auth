@@ -1,0 +1,37 @@
+{
+  "name": "fiapx-auth",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FIAP X: cadastro, login, recuperação e troca de senha e authorizer JWT (Lambdas Node.js)",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "jest",
+    "test:unit": "jest tests/unit tests/contract",
+    "test:integration": "INTEGRATION=1 jest --runInBand tests/integration",
+    "test:coverage": "INTEGRATION=1 jest --runInBand --coverage",
+    "migrate": "node scripts/migrate.js",
+    "dev": "node scripts/dev-server.js",
+    "build": "bash scripts/build.sh"
+  },
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "3.1169.0",
+    "@aws-sdk/client-sqs": "3.1169.0",
+    "@aws-sdk/client-ssm": "3.1169.0",
+    "bcryptjs": "3.0.3",
+    "jsonwebtoken": "9.0.3",
+    "mysql2": "3.24.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "eslint": "10.15.0",
+    "globals": "17.14.0",
+    "jest": "30.5.2"
+  }
+}

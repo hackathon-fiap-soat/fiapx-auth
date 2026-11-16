@@ -1,0 +1,75 @@
+name: ci
+
+# Checks de todo PR: lint, testes (unitários, contrato e integração com MySQL + LocalStack do
+# fiapx-infra/local, cobertura ≥ 80%), build do pacote e validação do Terraform.
+# O deploy (deploy.yml reutilizável, ADR-018) entra na Etapa 8, junto com o OIDC e o SonarCloud.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: fiapx-auth
+    steps:
+      # Os três repositórios lado a lado, como na máquina de quem desenvolve.
+      - uses: actions/checkout@v4
+        with:
+          path: fiapx-auth
+      - uses: actions/checkout@v4
+        with:
+          repository: hackathon-fiap-soat/fiapx-docs
+          path: fiapx-docs
+      - uses: actions/checkout@v4
+        with:
+          repository: hackathon-fiap-soat/fiapx-infra
+          path: fiapx-infra
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: fiapx-auth/.nvmrc
+          cache: npm
+          cache-dependency-path: fiapx-auth/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - name: Subir o ambiente local (MySQL + LocalStack + Mailpit)
+        working-directory: fiapx-infra/local
+        run: docker compose up -d --wait
+      - name: Testes com cobertura (unitários, contrato e integração)
+        run: npm run test:coverage
+      - name: Logs do ambiente em caso de falha
+        if: failure()
+        working-directory: fiapx-infra/local
+        run: docker compose logs --no-color
+      - name: Build do pacote das Lambdas
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fiapx-auth-zip
+          path: fiapx-auth/dist/fiapx-auth.zip
+          retention-days: 7
+
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate

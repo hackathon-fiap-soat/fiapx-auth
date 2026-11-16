@@ -21,7 +21,7 @@ Repositórios na organização [hackathon-fiap-soat](https://github.com/hackatho
 |---|---|---|---|
 | [`fiapx-docs`](https://github.com/hackathon-fiap-soat/fiapx-docs) | Documentação: arquitetura, ADRs, RFCs, contratos, OpenAPI, diagramas e entrega | Markdown + Mermaid + JSON Schema | Etapa 1 ✅ |
 | [`fiapx-infra`](https://github.com/hackathon-fiap-soat/fiapx-infra) | VPC, EKS, Aurora, S3, SQS, SES, ECR, API Gateway, OIDC, SSM, orquestrador de deploy e ambiente local | Terraform + Helm + docker-compose | Etapa 2 ✅ (local), Etapas 7–8 |
-| **fiapx-auth** | Lambdas de cadastro, login, senha e authorizer JWT | Node.js 24 + Terraform | Etapa 3 |
+| **fiapx-auth** | Lambdas de cadastro, login, senha e authorizer JWT | Node.js 24 + Terraform | Etapa 3 ✅ |
 | [`fiapx-video-api`](https://github.com/hackathon-fiap-soat/fiapx-video-api) | API de vídeos, URLs pré-assinadas, orquestrador da SAGA e outbox | PHP 8.4.27 + Laravel 13 no EKS | Etapa 4 |
 | [`fiapx-video-processor`](https://github.com/hackathon-fiap-soat/fiapx-video-processor) | Worker que extrai os frames com ffmpeg e gera o zip | PHP 8.4.27 + Laravel 13 no EKS + KEDA | Etapa 5 |
 | [`fiapx-notification`](https://github.com/hackathon-fiap-soat/fiapx-notification) | E-mails pelo SES com histórico e idempotência no DynamoDB | Node.js 24 + Terraform | Etapa 6 |
@@ -43,7 +43,8 @@ Decisão nova ou que contrarie uma existente vira ADR no `fiapx-docs`.
 
 ## Andamento (2026-11-16)
 
-Etapas 0 (repositórios), 1 (documentação) e 2 (ambiente local) concluídas. Próxima: Etapa 3 (`fiapx-auth`).
+Etapas 0 (repositórios), 1 (documentação), 2 (ambiente local) e 3 (`fiapx-auth`) concluídas. Próxima:
+Etapa 4 (`fiapx-video-api`).
 Ordem do plano: 3 auth → 4 video-api → 5 processor → 6 notification → 6.5 web → 7 infra AWS 🛑 → 8 CI/CD →
 9 observabilidade → 10 carga e entregáveis 🛑. O estado atualizado está no painel.
 
@@ -76,17 +77,19 @@ Para um serviço usar o LocalStack: `AWS_ENDPOINT_URL=http://localhost:4566`, `A
 `AWS_SECRET_ACCESS_KEY=test`, `AWS_REGION=us-east-1`. Os nomes dos recursos vêm do SSM em `/fiapx/local/...`
 (mesmas chaves de produção, com `<env>` = `local`).
 
-## Este repositório (Etapa 3)
+## Este repositório (Etapa 3 ✅)
 
-Lambdas Node.js 24 atrás do API Gateway, com Terraform em `infra/`. Estrutura prevista (spec §8.3):
+Lambdas Node.js 24 atrás do API Gateway, com Terraform em `infra/`. Detalhes de rotas, variáveis e
+comandos no `README.md`. Estrutura:
 
 ```text
 src/domain/          User, Email, Password (política de senha)
-src/application/     RegisterUser, AuthenticateUser, VerifyToken, RequestPasswordReset, ResetPassword, ChangePassword + ports
-src/infrastructure/  MysqlUserRepository (mysql2), BcryptHasher, JwtRs256Signer, SecretsProvider, SqsNotificationPublisher
+src/application/     use-cases.js (register, authenticate, authorize, forgot, verify, reset, change) + ports.js
+src/infrastructure/  config (env ou SSM), mysql, security (bcrypt, JWT, token, UUID v7), SQS, container
 src/handlers/        register.js, login.js, password.js, authorizer.js
-migrations/          users, password_reset_tokens (database fiapx_auth)
-tests/               jest: unit + integração (MySQL e LocalStack do compose)
+migrations/          users, password_reset_tokens (database fiapx_auth); scripts/migrate.js aplica
+scripts/             dev-server.js (imita o API Gateway em :3001), build.sh (zip das Lambdas)
+tests/               unit/, contract/ (schemas do ../fiapx-docs) e integration/ (INTEGRATION=1, compose de pé)
 infra/               Terraform: Lambdas, roles, rotas /api/auth/*, authorizer
 ```
 
@@ -108,6 +111,24 @@ Regras principais (ADR-004, ADR-017, OpenAPI em `fiapx-docs/api/openapi.yaml`):
 
 **DoD da Etapa 3:** testes verdes (≥ 80%); login local devolve JWT válido; o authorizer aceita e rejeita
 corretamente; a recuperação gera e-mail no Mailpit e o link redefine a senha uma única vez.
+
+Situação: tudo cumprido, exceto a entrega no Mailpit, que depende do `fiapx-notification` (Etapa 6). Até lá,
+o `PASSWORD_RESET` fica na fila `notification-commands` e é validado pelo contract test e pela integração.
+
+Comandos: `npm run lint`, `npm test` (sem Docker), `npm run test:coverage` (com o compose; é o que o CI
+roda), `npm run dev`, `npm run migrate`, `npm run build`. Decisões de implementação:
+
+- O verificador segue o [contrato do JWT](https://github.com/hackathon-fiap-soat/fiapx-docs/blob/main/contracts/jwt/README.md)
+  (só RS256, `iss`, `aud`, `exp`, tolerância de 30 s, claims `sub`/`email`/`name`), testado pelos vetores em
+  `tests/contract/jwt.test.js`. Mudou uma regra? Mude o contrato e os vetores no `fiapx-docs` primeiro,
+  porque o `fiapx-video-api` valida o mesmo token.
+- O authorizer fica fora da VPC e recebe a chave pública por variável de ambiente (o Terraform lê do SSM no
+  deploy). Rotacionar a chave exige novo deploy do `fiapx-auth`.
+- Login de e-mail inexistente compara a senha com um hash bcrypt fictício, para o tempo de resposta não
+  revelar quem tem cadastro.
+- O LocalStack Community não emula o HTTP API (v2): as rotas e o authorizer são exercitados localmente pelo
+  `scripts/dev-server.js`.
+- `deploy.yml` (ADR-018), OIDC e SonarCloud entram na Etapa 8.
 
 ## Skills deste repositório
 
