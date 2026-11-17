@@ -1,4 +1,4 @@
-name: deploy
+name: Deploy · Lambdas de auth, rotas do API Gateway e migrations
 
 # Deploy das Lambdas e das rotas /api/auth/* (ADR-018): no merge na main e chamado pelo deploy-all do
 # fiapx-infra. Credenciais da AWS Academy em Secrets (ADR-019). Com o ambiente destruído, falha ao ler o SSM.
@@ -18,24 +18,29 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Chamado pelo deploy-all, aparece como "3 · Auth (Lambdas e rotas) / Implantar".
   deploy:
+    name: Implantar
     runs-on: ubuntu-latest
     environment: prod
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - name: Baixar o fiapx-auth
+        uses: actions/checkout@v4
         with: { repository: hackathon-fiap-soat/fiapx-auth }
-      - uses: actions/setup-node@v4
+      - name: Instalar o Node.js (versão do .nvmrc)
+        uses: actions/setup-node@v4
         with: { node-version-file: .nvmrc }
-      - name: Pacote das Lambdas
+      - name: Gerar o pacote das Lambdas (zip)
         run: npm run build
-      - id: aws
+      - name: Autenticar na AWS Academy e garantir o bucket do state
+        id: aws
         uses: hackathon-fiap-soat/fiapx-infra/.github/actions/aws-lab@main
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-      - name: Ambiente no ar?
+      - name: Conferir se o ambiente prod está no ar (parâmetros do SSM)
         run: |
           for p in apigw/api_id sqs/notification-commands/url db/auth/secret_arn; do
             aws ssm get-parameter --name "/fiapx/prod/$p" >/dev/null 2>&1 || {
@@ -43,14 +48,15 @@ jobs:
               exit 1
             }
           done
-      - uses: hashicorp/setup-terraform@v3
+      - name: Instalar o Terraform
+        uses: hashicorp/setup-terraform@v3
         with: { terraform_version: 1.15.8, terraform_wrapper: false }
-      - name: Terraform apply (Lambdas, rotas e authorizer)
+      - name: Aplicar as Lambdas, as rotas e o authorizer (Terraform)
         working-directory: infra
         run: |
           terraform init -input=false -backend-config="bucket=${{ steps.aws.outputs.state-bucket }}"
           terraform apply -auto-approve -input=false -lock-timeout=10m
-      - name: Migrations (Lambda migrate, dentro da VPC)
+      - name: Rodar as migrations (Lambda migrate, dentro da VPC)
         run: |
           set -euo pipefail
           nome=$(terraform -chdir=infra output -json lambda_names | jq -r .migrate)
@@ -61,7 +67,7 @@ jobs:
             echo "::error::As migrations falharam (veja o log acima e o CloudWatch da Lambda $nome)."
             exit 1
           fi
-      - name: Resumo
+      - name: Escrever o resumo do deploy
         run: |
           {
             echo "### fiapx-auth implantado"
