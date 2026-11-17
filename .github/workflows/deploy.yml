@@ -53,6 +53,10 @@ jobs:
         with: { terraform_version: 1.15.8, terraform_wrapper: false }
       - name: Aplicar as Lambdas, as rotas e o authorizer (Terraform)
         working-directory: infra
+        env:
+          # New Relic (Etapa 9): vazios = Lambdas sem instrumentação.
+          TF_VAR_newrelic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+          TF_VAR_newrelic_account_id: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
         run: |
           terraform init -input=false -backend-config="bucket=${{ steps.aws.outputs.state-bucket }}"
           terraform apply -auto-approve -input=false -lock-timeout=10m

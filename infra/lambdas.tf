@@ -72,14 +72,20 @@ resource "aws_lambda_function" "this" {
   role             = data.aws_iam_role.lab.arn
   runtime          = "nodejs24.x"
   architectures    = ["arm64"]
-  handler          = each.value.handler
+  handler          = local.newrelic ? "newrelic-lambda-wrapper.handler" : each.value.handler
+  layers           = local.newrelic ? [local.newrelic_layer] : []
   filename         = var.lambda_zip
   source_code_hash = filebase64sha256(var.lambda_zip)
   memory_size      = each.value.memory
   timeout          = each.key == "migrate" ? 60 : 10
 
   environment {
-    variables = merge(local.env_comum, local.env_por_lambda[each.key])
+    variables = merge(
+      local.env_comum,
+      local.env_por_lambda[each.key],
+      local.newrelic_env,
+      local.newrelic ? { NEW_RELIC_LAMBDA_HANDLER = each.value.handler } : {},
+    )
   }
 
   dynamic "vpc_config" {

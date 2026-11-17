@@ -141,6 +141,9 @@ Lambdas não consultam o SSM em tempo de execução.
 - `destroy.yml`: chamado pelo `destroy-all`.
 - Credenciais da AWS Academy nos Secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` e `AWS_SESSION_TOKEN`,
   atualizados a cada sessão do lab (ADR-019).
+- New Relic (Etapa 9): com os Secrets `NEW_RELIC_LICENSE_KEY` e `NEW_RELIC_ACCOUNT_ID`, o `infra/newrelic.tf` põe a layer
+  da extensão nas cinco Lambdas (handler `newrelic-lambda-wrapper.handler`, original em `NEW_RELIC_LAMBDA_HANDLER`) e
+  grava a license key no segredo `fiapx/<env>/auth/newrelic`. Sem os Secrets, nada muda.
 
 ## Links
 
