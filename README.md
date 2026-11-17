@@ -42,7 +42,7 @@ src/handlers/        register, login, password (4 rotas) e authorizer, no format
 migrations/          users e password_reset_tokens (database fiapx_auth)
 scripts/             migrate.js, dev-server.js (imita o API Gateway), build.sh (zip das Lambdas)
 tests/               unit/, contract/ (schemas do fiapx-docs) e integration/ (MySQL + LocalStack)
-infra/               Terraform: 4 Lambdas, roles com menor privilégio, rotas, authorizer, logs
+infra/               Terraform: 4 Lambdas (LabRole), rotas, authorizer, logs
 ```
 
 ## Como rodar
@@ -113,9 +113,12 @@ Lambdas não consultam o SSM em tempo de execução.
 
 ## Infraestrutura (`infra/`)
 
-- Quatro Lambdas `nodejs24.x` (arm64) com o mesmo pacote (`npm run build` → `dist/fiapx-auth.zip`). Cada
-  uma tem uma role com só o que usa: `register` lê o segredo do banco; `login` lê o do banco e a chave
-  privada; `password` lê os dois e publica na fila `notification-commands`; o `authorizer` não lê segredo.
+- Quatro Lambdas `nodejs24.x` (arm64) com o mesmo pacote (`npm run build` → `dist/fiapx-auth.zip`). Todas
+  usam a `LabRole`, porque a AWS Academy não permite criar roles
+  ([ADR-019](https://github.com/hackathon-fiap-soat/fiapx-docs/blob/main/04-adrs/ADR-019-deploy-na-aws-academy-learner-lab.md)).
+  O mínimo que cada uma usa (e que uma role própria teria): `register` lê o segredo do banco; `login` lê o do
+  banco e a chave privada; `password` lê os dois e publica na fila `notification-commands`; o `authorizer` não
+  lê segredo.
 - `register`, `login` e `password` rodam na VPC (acesso ao Aurora). O `authorizer` fica fora dela: valida o
   JWT só com a chave pública, sem cold start de rede.
 - Rotas, integrações e authorizer (REQUEST, payload 2.0, respostas simples, cache de 300 s) no HTTP API do

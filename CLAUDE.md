@@ -90,7 +90,7 @@ src/handlers/        register.js, login.js, password.js, authorizer.js
 migrations/          users, password_reset_tokens (database fiapx_auth); scripts/migrate.js aplica
 scripts/             dev-server.js (imita o API Gateway em :3001), build.sh (zip das Lambdas)
 tests/               unit/, contract/ (schemas do ../fiapx-docs) e integration/ (INTEGRATION=1, compose de pé)
-infra/               Terraform: Lambdas, roles, rotas /api/auth/*, authorizer
+infra/               Terraform: Lambdas (LabRole, ADR-019), rotas /api/auth/*, authorizer
 ```
 
 Regras principais (ADR-004, ADR-017, OpenAPI em `fiapx-docs/api/openapi.yaml`):
