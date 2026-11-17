@@ -94,6 +94,8 @@ npm run test:coverage       # tudo, com cobertura mínima de 80% (é o que o CI 
   e recusam exatamente os mesmos tokens.
 - A integração usa os mesmos handlers da AWS, com MySQL, SSM, Secrets Manager e SQS do LocalStack.
 
+No CI, depois dos testes: Análise no **SonarCloud** ([organização `hackathon-fiap-soat`](https://sonarcloud.io/organizations/hackathon-fiap-soat/projects)) depois dos testes, com a cobertura e o Quality Gate como check (`sonar-project.properties`, Secret `SONAR_TOKEN`).
+
 ## Variáveis de ambiente
 
 | Variável | Uso | Padrão |
