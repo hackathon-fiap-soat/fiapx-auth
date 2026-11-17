@@ -56,7 +56,8 @@ resource "aws_lambda_permission" "authorizer" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.this["authorizer"].function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${local.api_source_arn}/authorizers/${aws_apigatewayv2_authorizer.jwt.id}"
+  # Num HTTP API, a chamada do authorizer vem de <execution_arn>/authorizers/<id>, sem o segmento do stage.
+  source_arn = "${local.api_execution_arn}/authorizers/${aws_apigatewayv2_authorizer.jwt.id}"
 }
 
 # O fiapx-video-api usa o mesmo authorizer nas rotas /api/videos* (ADR-010).
