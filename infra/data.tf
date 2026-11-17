@@ -40,7 +40,8 @@ data "aws_ssm_parameter" "web_url" {
 }
 
 locals {
-  subnet_ids     = split(",", nonsensitive(data.aws_ssm_parameter.private_subnet_ids.value))
-  api_id         = nonsensitive(data.aws_ssm_parameter.api_id.value)
-  api_source_arn = "arn:aws:execute-api:${var.region}:${data.aws_caller_identity.atual.account_id}:${local.api_id}/*"
+  subnet_ids        = split(",", nonsensitive(data.aws_ssm_parameter.private_subnet_ids.value))
+  api_id            = nonsensitive(data.aws_ssm_parameter.api_id.value)
+  api_execution_arn = "arn:aws:execute-api:${var.region}:${data.aws_caller_identity.atual.account_id}:${local.api_id}"
+  api_source_arn    = "${local.api_execution_arn}/*"
 }
