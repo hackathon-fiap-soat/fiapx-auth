@@ -19,7 +19,7 @@ process.env.AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || 'test';
 process.env.AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || 'test';
 
 const container = require('../../src/infrastructure/container');
-const { migrar } = require('../../scripts/migrate');
+const { migrar } = require('../../src/infrastructure/migrations');
 const register = require('../../src/handlers/register').handler;
 const login = require('../../src/handlers/login').handler;
 const password = require('../../src/handlers/password').handler;

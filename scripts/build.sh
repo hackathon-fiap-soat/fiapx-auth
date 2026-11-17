@@ -6,8 +6,8 @@ cd "$(dirname "$0")/.."
 
 rm -rf build dist
 mkdir -p build dist
-cp -R src package.json package-lock.json build/
+cp -R src migrations package.json package-lock.json build/
 (cd build && npm ci --omit=dev --ignore-scripts --no-audit --no-fund --loglevel=error && find node_modules -type d -empty -delete)
-(cd build && zip -qr ../dist/fiapx-auth.zip src node_modules package.json)
+(cd build && zip -qr ../dist/fiapx-auth.zip src migrations node_modules package.json)
 rm -rf build
 echo "dist/fiapx-auth.zip ($(du -h dist/fiapx-auth.zip | cut -f1))"

@@ -1,4 +1,4 @@
-# Quatro Lambdas com o mesmo pacote e handlers diferentes. Na AWS Academy não é possível criar roles, então
+# Cinco Lambdas com o mesmo pacote e handlers diferentes. Na AWS Academy não é possível criar roles, então
 # todas usam a LabRole (fiapx-docs ADR-019). As permissões mínimas de cada uma, que uma role própria teria em
 # conta própria, estão em fiapx-docs/03-arquitetura/seguranca.md.
 locals {
@@ -16,6 +16,12 @@ locals {
     password = {
       handler = "src/handlers/password.handler"
       memory  = 1024
+      vpc     = true
+    }
+    # Sem rota: o deploy.yml a invoca depois do apply para aplicar migrations/ no Aurora (privado).
+    migrate = {
+      handler = "src/handlers/migrate.handler"
+      memory  = 256
       vpc     = true
     }
     # O authorizer não acessa banco nem segredo: valida o JWT com a chave pública em variável de ambiente.
@@ -37,6 +43,7 @@ locals {
   }
   env_por_lambda = {
     register = { DB_SECRET_ARN = local.segredos.db }
+    migrate  = { DB_SECRET_ARN = local.segredos.db }
     login    = { DB_SECRET_ARN = local.segredos.db, JWT_PRIVATE_KEY_SECRET_ARN = local.segredos.jwt }
     password = {
       DB_SECRET_ARN              = local.segredos.db
@@ -69,7 +76,7 @@ resource "aws_lambda_function" "this" {
   filename         = var.lambda_zip
   source_code_hash = filebase64sha256(var.lambda_zip)
   memory_size      = each.value.memory
-  timeout          = 10
+  timeout          = each.key == "migrate" ? 60 : 10
 
   environment {
     variables = merge(local.env_comum, local.env_por_lambda[each.key])

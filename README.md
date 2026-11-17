@@ -3,7 +3,7 @@
 Autenticação do FIAP X: cadastro, login, recuperação e troca de senha e o Lambda Authorizer (JWT RS256), com as rotas `/api/auth/*` no API Gateway.
 
 > Parte do **Hackathon FIAP X — Processador de Vídeos** (PÓS TECH SOAT, Fase 5).
-> Etapa 3 concluída (código, testes e Terraform); o deploy pelo GitHub Actions entra na Etapa 8. A documentação vem antes do código: a arquitetura, as decisões (ADRs/RFCs) e os
+> Etapa 3 concluída (código, testes e Terraform); deploy pelo GitHub Actions em `deploy.yml`. A documentação vem antes do código: a arquitetura, as decisões (ADRs/RFCs) e os
 > contratos ficam em [`fiapx-docs`](https://github.com/hackathon-fiap-soat/fiapx-docs).
 
 ## Stack
@@ -113,22 +113,32 @@ Lambdas não consultam o SSM em tempo de execução.
 
 ## Infraestrutura (`infra/`)
 
-- Quatro Lambdas `nodejs24.x` (arm64) com o mesmo pacote (`npm run build` → `dist/fiapx-auth.zip`). Todas
+- Cinco Lambdas `nodejs24.x` (arm64) com o mesmo pacote (`npm run build` → `dist/fiapx-auth.zip`). Todas
   usam a `LabRole`, porque a AWS Academy não permite criar roles
   ([ADR-019](https://github.com/hackathon-fiap-soat/fiapx-docs/blob/main/04-adrs/ADR-019-deploy-na-aws-academy-learner-lab.md)).
   O mínimo que cada uma usa (e que uma role própria teria): `register` lê o segredo do banco; `login` lê o do
   banco e a chave privada; `password` lê os dois e publica na fila `notification-commands`; o `authorizer` não
-  lê segredo.
-- `register`, `login` e `password` rodam na VPC (acesso ao Aurora). O `authorizer` fica fora dela: valida o
+  lê segredo; `migrate` lê o segredo do banco.
+- `register`, `login`, `password` e `migrate` rodam na VPC (acesso ao Aurora). O `authorizer` fica fora dela: valida o
   JWT só com a chave pública, sem cold start de rede.
 - Rotas, integrações e authorizer (REQUEST, payload 2.0, respostas simples, cache de 300 s) no HTTP API do
   `fiapx-infra`. O stage e o rate limit por rota ficam no `fiapx-infra`.
 - Publica `/fiapx/<env>/auth/authorizer_id`, usado pelas rotas do `fiapx-video-api`.
 - Lê do SSM: `vpc/private_subnet_ids`, `vpc/lambda_security_group_id`, `apigw/api_id`, `db/auth/secret_arn`,
-  `auth/jwt_private_key_secret_arn`, `auth/jwt_public_key`, `sqs/notification-commands/url` e `/arn`, `web/url`.
-- O CI roda `terraform fmt -check` e `validate`. O `plan` e o `apply` entram na Etapa 8, porque dependem da
-  infraestrutura da AWS (Etapa 7). O LocalStack Community não emula o API Gateway HTTP API (v2), então a
+  `auth/jwt_private_key_secret_arn`, `auth/jwt_public_key`, `sqs/notification-commands/url`, `web/url`.
+- A Lambda `migrate` não tem rota: o deploy a invoca depois do `apply` para aplicar `migrations/` no Aurora,
+  que fica em subnet privada e não é alcançável pelo runner do GitHub. Localmente, `npm run migrate` faz o mesmo.
+- O CI roda `terraform fmt -check` e `validate`. O LocalStack Community não emula o API Gateway HTTP API (v2), então a
   validação local das rotas é feita pelo `npm run dev`.
+
+## Deploy
+
+- `deploy.yml`: em todo merge na `main` e quando o `deploy-all` do `fiapx-infra` chama (ADR-018). Gera o
+  pacote, roda `terraform apply` em `infra/` (state `fiapx-auth/prod.tfstate` no bucket
+  `fiapx-tfstate-<account_id>`) e invoca a Lambda `migrate`. Com o ambiente destruído, falha ao ler o SSM.
+- `destroy.yml`: chamado pelo `destroy-all`.
+- Credenciais da AWS Academy nos Secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` e `AWS_SESSION_TOKEN`,
+  atualizados a cada sessão do lab (ADR-019).
 
 ## Links
 

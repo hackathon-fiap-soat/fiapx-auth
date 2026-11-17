@@ -128,7 +128,8 @@ roda), `npm run dev`, `npm run migrate`, `npm run build`. Decisões de implement
   revelar quem tem cadastro.
 - O LocalStack Community não emula o HTTP API (v2): as rotas e o authorizer são exercitados localmente pelo
   `scripts/dev-server.js`.
-- `deploy.yml` (ADR-018), OIDC e SonarCloud entram na Etapa 8.
+- `deploy.yml`/`destroy.yml` reutilizáveis (ADR-018) com as credenciais da AWS Academy (ADR-019); as migrations
+  rodam pela Lambda `migrate` (sem rota), invocada pelo deploy. SonarCloud entra na Etapa 8.
 
 ## Skills deste repositório
 
