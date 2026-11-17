@@ -35,10 +35,6 @@ data "aws_ssm_parameter" "notification_queue_url" {
   name = "${local.ssm}/sqs/notification-commands/url"
 }
 
-data "aws_ssm_parameter" "notification_queue_arn" {
-  name = "${local.ssm}/sqs/notification-commands/arn"
-}
-
 data "aws_ssm_parameter" "web_url" {
   name = "${local.ssm}/web/url"
 }

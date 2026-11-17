@@ -1,36 +1,35 @@
-# Quatro Lambdas com o mesmo pacote e handlers diferentes. Cada uma tem a própria role, com só as
-# permissões que usa (fiapx-docs/03-arquitetura/seguranca.md).
+# Cinco Lambdas com o mesmo pacote e handlers diferentes. Na AWS Academy não é possível criar roles, então
+# todas usam a LabRole (fiapx-docs ADR-019). As permissões mínimas de cada uma, que uma role própria teria em
+# conta própria, estão em fiapx-docs/03-arquitetura/seguranca.md.
 locals {
   lambdas = {
     register = {
-      handler     = "src/handlers/register.handler"
-      memory      = 1024 # bcrypt custo 12 em JavaScript: mais memória = mais CPU = login mais rápido
-      vpc         = true
-      secrets     = ["db"]
-      envia_email = false
+      handler = "src/handlers/register.handler"
+      memory  = 1024 # bcrypt custo 12 em JavaScript: mais memória = mais CPU = login mais rápido
+      vpc     = true
     }
     login = {
-      handler     = "src/handlers/login.handler"
-      memory      = 1024
-      vpc         = true
-      secrets     = ["db", "jwt"]
-      envia_email = false
+      handler = "src/handlers/login.handler"
+      memory  = 1024
+      vpc     = true
     }
     password = {
-      handler     = "src/handlers/password.handler"
-      memory      = 1024
-      vpc         = true
-      secrets     = ["db", "jwt"]
-      envia_email = true
+      handler = "src/handlers/password.handler"
+      memory  = 1024
+      vpc     = true
+    }
+    # Sem rota: o deploy.yml a invoca depois do apply para aplicar migrations/ no Aurora (privado).
+    migrate = {
+      handler = "src/handlers/migrate.handler"
+      memory  = 256
+      vpc     = true
     }
     # O authorizer não acessa banco nem segredo: valida o JWT com a chave pública em variável de ambiente.
     # Fica fora da VPC (sem cold start de ENI) e responde em poucos milissegundos.
     authorizer = {
-      handler     = "src/handlers/authorizer.handler"
-      memory      = 256
-      vpc         = false
-      secrets     = []
-      envia_email = false
+      handler = "src/handlers/authorizer.handler"
+      memory  = 256
+      vpc     = false
     }
   }
 
@@ -44,6 +43,7 @@ locals {
   }
   env_por_lambda = {
     register = { DB_SECRET_ARN = local.segredos.db }
+    migrate  = { DB_SECRET_ARN = local.segredos.db }
     login    = { DB_SECRET_ARN = local.segredos.db, JWT_PRIVATE_KEY_SECRET_ARN = local.segredos.jwt }
     password = {
       DB_SECRET_ARN              = local.segredos.db
@@ -55,62 +55,8 @@ locals {
   }
 }
 
-data "aws_iam_policy_document" "assume_lambda" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["lambda.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "lambda" {
-  for_each           = local.lambdas
-  name               = "${local.prefix}-${each.key}"
-  assume_role_policy = data.aws_iam_policy_document.assume_lambda.json
-}
-
-resource "aws_iam_role_policy_attachment" "logs" {
-  for_each   = { for k, v in local.lambdas : k => v if !v.vpc }
-  role       = aws_iam_role.lambda[each.key].name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-# Inclui as permissões de logs e de criação das interfaces de rede na VPC.
-resource "aws_iam_role_policy_attachment" "vpc" {
-  for_each   = { for k, v in local.lambdas : k => v if v.vpc }
-  role       = aws_iam_role.lambda[each.key].name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
-
-data "aws_iam_policy_document" "acesso" {
-  for_each = { for k, v in local.lambdas : k => v if length(v.secrets) > 0 || v.envia_email }
-
-  dynamic "statement" {
-    for_each = length(each.value.secrets) > 0 ? [1] : []
-    content {
-      sid       = "LerSegredos"
-      actions   = ["secretsmanager:GetSecretValue"]
-      resources = [for s in each.value.secrets : local.segredos[s]]
-    }
-  }
-
-  dynamic "statement" {
-    for_each = each.value.envia_email ? [1] : []
-    content {
-      sid       = "PublicarSendNotification"
-      actions   = ["sqs:SendMessage"]
-      resources = [data.aws_ssm_parameter.notification_queue_arn.value]
-    }
-  }
-}
-
-resource "aws_iam_role_policy" "acesso" {
-  for_each = toset([for k, v in local.lambdas : k if length(v.secrets) > 0 || v.envia_email])
-  name     = "acesso"
-  role     = aws_iam_role.lambda[each.key].id
-  policy   = data.aws_iam_policy_document.acesso[each.key].json
+data "aws_iam_role" "lab" {
+  name = "LabRole"
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
@@ -123,14 +69,14 @@ resource "aws_lambda_function" "this" {
   for_each = local.lambdas
 
   function_name    = "${local.prefix}-${each.key}"
-  role             = aws_iam_role.lambda[each.key].arn
+  role             = data.aws_iam_role.lab.arn
   runtime          = "nodejs24.x"
   architectures    = ["arm64"]
   handler          = each.value.handler
   filename         = var.lambda_zip
   source_code_hash = filebase64sha256(var.lambda_zip)
   memory_size      = each.value.memory
-  timeout          = 10
+  timeout          = each.key == "migrate" ? 60 : 10
 
   environment {
     variables = merge(local.env_comum, local.env_por_lambda[each.key])
@@ -148,6 +94,4 @@ resource "aws_lambda_function" "this" {
     log_format = "Text" # os handlers já escrevem uma linha JSON por evento
     log_group  = aws_cloudwatch_log_group.lambda[each.key].name
   }
-
-  depends_on = [aws_iam_role_policy_attachment.logs, aws_iam_role_policy_attachment.vpc]
 }
